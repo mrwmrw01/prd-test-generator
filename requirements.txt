@@ -1,0 +1,6 @@
+markdown
+PyYAML
+jinja2
+# GUI framework options (uncomment one)
+# PyQt6
+# tkinter is usually built-in
