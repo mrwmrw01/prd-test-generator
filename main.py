@@ -29,6 +29,10 @@ def main():
     
     # Console mode
     console_main()
+    
+    # Exit after demo
+    if len(sys.argv) > 1 and sys.argv[1] != "--gui":
+        sys.exit(0)
 
 def console_main():
     print("PRD-to-Test-Script Generator")
@@ -37,10 +41,16 @@ def console_main():
     print("(Running in console mode - GUI requires additional system dependencies)")
     print()
     
-    # Show current directory
+    # Demo the generator if a PRD file is provided
+    if len(sys.argv) > 1 and sys.argv[1] != "--gui":
+        prd_file_path = sys.argv[1]
+        demo_generation(prd_file_path)
+        return
+    
+    # Show current directory (only in non-demo mode)
     print(f"Working directory: {os.getcwd()}")
     
-    # List project structure
+    # List project structure (only in non-demo mode)
     project_root = Path('.')
     print("\nProject structure:")
     for item in sorted(project_root.rglob('*'), key=lambda p: (not p.is_dir(), str(p))):
@@ -82,10 +92,6 @@ def console_main():
     print("- Console fallback mode")
     print("- Markdown PRD parser (basic)")
     print("- Test generators for Python, Java, and TypeScript")
-    
-    # Demo the generator if a PRD file is provided
-    if len(sys.argv) > 2 and sys.argv[1] != "--gui":
-        demo_generation(sys.argv[1])
 
 def demo_generation(prd_file_path):
     """Demo the test generation with a sample PRD file"""
