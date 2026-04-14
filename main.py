@@ -1,182 +1,193 @@
 #!/usr/bin/env python3
 """
 PRD-to-Test-Script Generator
-Main application entry point
+Main application entry point with GUI and CLI support
 """
 
 import sys
 import os
+import argparse
 from pathlib import Path
 
 # Add the project root to Python path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
+
 def main():
-    # Check if we should try GUI or use console
-    use_gui = len(sys.argv) > 1 and sys.argv[1] == "--gui"
+    """Main entry point"""
+    parser = argparse.ArgumentParser(
+        description='PRD-to-Test-Script Generator - Convert PRDs to test scripts',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python main.py sample_prd.md           # Console mode with file
+  python main.py                         # Console mode (interactive)
+  python main.py --gui                   # Launch GUI application
+  python main.py sample_prd.md --gui     # Launch GUI (load file)
+
+Languages: Python (pytest), Java (JUnit5), TypeScript (Jest)
+        """
+    )
     
-    if use_gui:
+    parser.add_argument(
+        'file',
+        nargs='?',
+        help='Path to PRD file (Markdown format)'
+    )
+    parser.add_argument(
+        '--gui', '-g',
+        action='store_true',
+        help='Launch GUI application'
+    )
+    
+    args = parser.parse_args()
+    
+    # Load file into clipboard-like state if provided
+    if args.file:
+        os.environ['PRD_FILE'] = args.file
+    
+    # Launch GUI if requested or no arguments
+    if args.gui or not args.file:
         try:
-            # Import and run the GUI application
             from gui.main_window import main as gui_main
+            print("Launching GUI application...")
             gui_main()
             return
         except ImportError as e:
             print(f"GUI not available: {e}")
-            print("Falling back to console mode...")
-            print("To use GUI, install system dependencies: libegl1-mesa and related libraries")
-    
-    # Console mode
-    console_main()
-    
-    # Exit after demo
-    if len(sys.argv) > 1 and sys.argv[1] != "--gui":
-        sys.exit(0)
+            print("Installing GUI dependencies...")
+            print("Run: pip install PyQt6")
+            console_main(args.file if args.file else None)
+            return
+    else:
+        # Console mode
+        console_main(args.file)
 
-def console_main():
+
+def console_main(prd_file=None):
+    """Console mode test generation"""
+    print("=" * 70)
     print("PRD-to-Test-Script Generator")
-    print("============================")
-    print("A GUI application that converts PRDs to test scripts")
-    print("(Running in console mode - GUI requires additional system dependencies)")
+    print("=" * 70)
     print()
     
-    # Demo the generator if a PRD file is provided
-    if len(sys.argv) > 1 and sys.argv[1] != "--gui":
-        prd_file_path = sys.argv[1]
-        demo_generation(prd_file_path)
+    # Get PRD file
+    if prd_file:
+        prd_path = prd_file
+    else:
+        prd_path = input("Enter PRD file path (or press Enter for sample): ").strip()
+        if not prd_path:
+            prd_path = str(project_root / "sample_prd.md")
+    
+    prd_path = Path(prd_path)
+    if not prd_path.exists():
+        print(f"Error: PRD file not found: {prd_path}")
         return
     
-    # Show current directory (only in non-demo mode)
-    print(f"Working directory: {os.getcwd()}")
-    
-    # List project structure (only in non-demo mode)
-    project_root = Path('.')
-    print("\nProject structure:")
-    for item in sorted(project_root.rglob('*'), key=lambda p: (not p.is_dir(), str(p))):
-        if any(part.startswith('.') for part in item.parts if part != '.'):
-            continue  # Skip hidden directories except current
-        indent = "  " * len(item.relative_to(project_root).parts)
-        if item.is_dir():
-            print(f"{indent}📁 {item.name}/")
-        else:
-            print(f"{indent}📄 {item.name}")
-    
-    print("\n" + "="*50)
-    print("NEXT STEPS FOR DEVELOPMENT:")
-    print("="*50)
-    print("1. Install system dependencies for GUI:")
-    print("   sudo apt-get install libegl1-mesa libxcb-xinerama0 libxcb-icccm4 libxcb-image0")
-    print("   libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-shm0")
-    print("   libxcb-sync1 libxcb-xfixes0 libxcb-xinerame0 libxcb-xkb1 libxcomposite1")
-    print("   libxcursor1 libxdamage1 libxfixes3 libxi6 libxrandr2 libxrender1 libxtst6")
-    print("   libxss1 libnss3 libasound2")
-    print()
-    print("2. Or use console mode for development:")
-    print("   python main.py          # Console mode")
-    print("   python main.py --gui    # Try GUI mode")
-    print()
-    print("3. Implement core components:")
-    print("   - Markdown PRD parser (parser/)")
-    print("   - Test generation templates (templates/)")
-    print("   - Requirement and test case models (models/)")
-    print("   - Generator engine (generator/)")
-    print()
-    
-    # Show what's implemented so far
-    print("\nCURRENTLY IMPLEMENTED:")
-    print("- Project structure")
-    print("- Requirements file (markdown, PyYAML, jinja2, PyQt6)")
-    print("- Data models for requirements and test cases")
-    print("- GUI main window (requires PyQt6 + system libs)")
-    print("- Console fallback mode")
-    print("- Markdown PRD parser (basic)")
-    print("- Test generators for Python, Java, and TypeScript")
-
-def demo_generation(prd_file_path):
-    """Demo the test generation with a sample PRD file"""
-    print("\n" + "="*50)
-    print("TEST GENERATION DEMO:")
-    print("="*50)
-    
     try:
-        # Import required modules
+        # Import modules
         from parser.markdown_parser import MarkdownParser
         from generator.generator import TestGenerator
         
-        # Check if file exists
-        prd_path = Path(prd_file_path)
-        if not prd_path.exists():
-            print(f"PRD file not found: {prd_file_path}")
-            print("Creating a sample PRD for demonstration...")
-            create_sample_prd(prd_path)
-        
-        # Parse the PRD
+        # Parse PRD
+        print(f"\nParsing PRD: {prd_path}")
+        print("-" * 50)
         parser = MarkdownParser()
         requirements = parser.parse_file(str(prd_path))
         
         if not requirements:
-            print("No requirements found in the PRD file.")
+            print("No requirements found in PRD file!")
             return
         
         print(f"Found {len(requirements)} requirements:")
         for req in requirements:
-            print(f"  - {req.id}: {req.title}")
+            print(f"  • {req.id}: {req.title}")
+            print(f"    Type: {req.requirement_type.value}")
+        print()
         
-        # Generate tests for each language
+        # Ask for language
+        print("Select target language:")
+        print("  1. Python (pytest)")
+        print("  2. Java (JUnit5)")
+        print("  3. TypeScript (Jest)")
+        print("  4. All languages")
+        
+        choice = input("\nYour choice [1-4]: ").strip()
+        language_map = {
+            '1': 'python',
+            '2': 'java',
+            '3': 'typescript',
+            '4': 'all'
+        }
+        
+        if choice in language_map:
+            if language_map[choice] == 'all':
+                languages = ['python', 'java', 'typescript']
+            else:
+                languages = [language_map[choice]]
+        else:
+            print("Invalid choice. Using Python by default.")
+            languages = ['python']
+        
+        # Ask for test type
+        print("\nSelect test type:")
+        print("  1. Unit")
+        print("  2. Integration")
+        print("  3. E2E")
+        print("  4. UAT")
+        
+        test_choice = input("\nYour choice [1-4]: ").strip()
+        test_type_map = {
+            '1': 'unit',
+            '2': 'integration',
+            '3': 'e2e',
+            '4': 'uat'
+        }
+        
+        test_type = test_type_map.get(test_choice, 'unit')
+        
+        # Generate tests
+        print(f"\nGenerating {test_type} tests for: {', '.join(languages)}")
+        print("-" * 50)
+        
         generator = TestGenerator()
-        languages = generator.get_supported_languages()
         
-        for language in languages:
-            print(f"\n--- Generating {language.upper()} tests ---")
-            try:
-                test_cases = generator.generate_tests(requirements, language, "unit")
-                for test_case in test_cases:
-                    print(f"\n{test_case.name}:")
-                    print(f"  Description: {test_case.description}")
-                    print(f"  Framework: {test_case.framework}")
-                    print("  Code:")
-                    # Indent the code for better readability
-                    indented_code = "\n  ".join(test_case.code.split("\n"))
-                    print(f"  {indented_code}")
-            except Exception as e:
-                print(f"Error generating {language} tests: {e}")
-                
+        for lang in languages:
+            print(f"\n{'=' * 50}")
+            print(f"{lang.upper()} TESTS")
+            print(f"{'=' * 50}")
+            
+            test_cases = generator.generate_tests(requirements, lang, test_type)
+            print(f"\nGenerated {len(test_cases)} test cases:")
+            
+            for i, test_case in enumerate(test_cases, 1):
+                print(f"\n[{i}/{len(test_cases)}] {test_case.name}")
+                print(f"    ID: {test_case.id}")
+                print(f"    Framework: {test_case.framework}")
+                print("\n    Code:")
+                # Show first few lines
+                lines = test_case.code.strip().split('\n')
+                for line in lines[:8]:
+                    print(f"      {line}")
+                if len(lines) > 8:
+                    print(f"      ... ({len(lines) - 8} more lines)")
+            
+            print()
+        
+        print("=" * 70)
+        print("Generation complete!")
+        print("=" * 70)
+        
     except ImportError as e:
-        print(f"Could not import required modules for demo: {e}")
+        print(f"Error: Could not import required modules: {e}")
+        print("\nMake sure you have installed the dependencies:")
+        print("  pip install markdown PyYAML jinja2")
     except Exception as e:
-        print(f"Error during demo: {e}")
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
 
-def create_sample_prd(file_path):
-    """Create a sample PRD file for demonstration"""
-    sample_content = """# Sample Product Requirements Document
-
-## Functional Requirements
-
-### REQ-001 User Login
-The system shall allow users to log in using their email and password.
-
-### REQ-002 Data Validation
-The system shall validate user input to prevent SQL injection attacks.
-
-### REQ-003 Report Generation
-The system shall generate monthly reports in PDF format.
-
-## Non-Functional Requirements
-
-### NFR-001 Performance
-The system shall respond to user requests within 2 seconds under normal load.
-
-### NFR-002 Security
-All sensitive data shall be encrypted using AES-256 encryption.
-"""
-    
-    try:
-        with open(file_path, 'w') as f:
-            f.write(sample_content)
-        print(f"Created sample PRD at: {file_path}")
-    except Exception as e:
-        print(f"Could not create sample PRD: {e}")
 
 if __name__ == "__main__":
     main()
